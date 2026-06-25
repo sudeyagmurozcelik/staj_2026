@@ -27,7 +27,11 @@ load_dotenv()
 DB_PATH = "chroma_db"
 TOP_K = 5
 EMBED_MODEL = "gemini-embedding-001"
-GEN_MODEL = "gemini-2.0-flash-lite"
+# Kota dolduğunda sıradaki modele geçilir
+GEN_MODELLER = [
+    "gemini-3-flash-preview",
+    "gemini-2.0-flash-lite",
+]
 
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
@@ -61,13 +65,18 @@ def embed(text: str) -> list[float]:
 def turkce_ingilizce_cevir(metin: str) -> str:
     """Türkçe sorguyu İngilizce'ye çevirir. Hata olursa orijinal metni döndürür."""
     try:
-        return gemini_uret(
+        # Çeviri için hızlı tek deneme — fallback döngüsü gerek yok
+        resp = client.models.generate_content(
+            model="gemini-2.0-flash-lite",
             contents=metin,
-            system=(
-                "Translate the following dental question from Turkish to English. "
-                "Output ONLY the English translation, nothing else."
+            config=types.GenerateContentConfig(
+                system_instruction=(
+                    "Translate the following dental question from Turkish to English. "
+                    "Output ONLY the English translation, nothing else."
+                )
             ),
         )
+        return resp.text.strip()
     except Exception:
         return metin
 
@@ -81,23 +90,36 @@ def retrieve(soru: str, k: int = TOP_K):
 
 
 def gemini_uret(contents: str, system: str) -> str:
-    """generate_content çağrısını 429/503 hatalarına karşı retry ile sarar."""
-    for attempt in range(4):
-        try:
-            resp = client.models.generate_content(
-                model=GEN_MODEL,
-                contents=contents,
-                config=types.GenerateContentConfig(system_instruction=system),
-            )
-            return resp.text.strip()
-        except Exception as e:
-            hata = str(e)
-            if "429" in hata or "503" in hata or "UNAVAILABLE" in hata or "EXHAUSTED" in hata:
-                bekleme = 5 * (attempt + 1)
-                time.sleep(bekleme)
-            else:
-                raise
-    raise HTTPException(status_code=503, detail="Gemini servisi şu an meşgul, lütfen biraz bekleyip tekrar dene.")
+    """
+    Modelleri sırayla dener.
+    429/EXHAUSTED → kota doldu, hemen sonraki modele geç (bekleme yok).
+    503/UNAVAILABLE → geçici hata, 3sn bekleyip bir kez daha dene.
+    """
+    for model in GEN_MODELLER:
+        for deneme in range(2):
+            try:
+                resp = client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(system_instruction=system),
+                )
+                return resp.text.strip()
+            except Exception as e:
+                hata = str(e)
+                if "429" in hata or "EXHAUSTED" in hata or "quota" in hata:
+                    break  # kota doldu — bekleme yok, hemen sonraki modele geç
+                elif "503" in hata or "UNAVAILABLE" in hata:
+                    if deneme == 0:
+                        time.sleep(3)  # geçici hata, bir kez bekle
+                    else:
+                        break
+                else:
+                    raise  # beklenmedik hata — direkt fırlat
+
+    raise HTTPException(
+        status_code=503,
+        detail="Tüm modellerin kotası doldu. Gece yarısından sonra (TSİ 10:00) tekrar dene."
+    )
 
 
 def baglam_olustur(documents, metadatas) -> str:
@@ -245,6 +267,11 @@ def asistan():
 @app.get("/saglik")
 def saglik():
     return {"durum": "calisiyor"}
+
+
+@app.get("/favicon.ico")
+def favicon():
+    raise HTTPException(status_code=204)
 
 
 @app.post("/sor", response_model=Cevap)

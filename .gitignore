@@ -1,4 +1,14 @@
-__pycache__/  
-venv/  
-chroma_db/  
-.env 
+# Hassas dosyalar
+.env
+Wheeler8.pdf
+
+# Oluşturulan dosyalar
+chroma_db/
+venv/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+

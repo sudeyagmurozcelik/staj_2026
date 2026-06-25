@@ -5,305 +5,278 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Diş Hekimliği AI Asistan</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #f0f4f8;
-      color: #1a2332;
-      min-height: 100vh;
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #eef2f7;
+      color: #1e293b;
     }
 
-    header {
-      background: linear-gradient(135deg, #0f4c75, #1b6ca8);
-      color: white;
-      padding: 20px 32px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    /* ── Header ─────────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      padding: 18px 32px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.18);
     }
-    header h1 { font-size: 1.4rem; font-weight: 600; }
-    header p  { font-size: 0.85rem; opacity: 0.8; margin-top: 3px; }
+    .header-sol h1 { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-sol p  { font-size: 0.8rem; color: rgba(255,255,255,0.65); margin-top: 2px; }
     .header-link {
-      font-size: 0.82rem;
-      color: rgba(255,255,255,0.75);
+      font-size: 0.8rem; font-weight: 600;
+      color: rgba(255,255,255,0.8);
       text-decoration: none;
       border: 1px solid rgba(255,255,255,0.3);
-      padding: 6px 14px;
-      border-radius: 20px;
-      transition: all 0.15s;
+      padding: 7px 16px; border-radius: 999px;
+      transition: background 0.15s, color 0.15s;
     }
-    .header-link:hover { background: rgba(255,255,255,0.1); color: white; }
+    .header-link:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
-    .container {
-      max-width: 820px;
-      margin: 32px auto;
+    /* ── Sayfa Gövdesi ───────────────────────── */
+    .sayfa {
+      max-width: 780px;
+      margin: 36px auto;
       padding: 0 16px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 18px;
     }
 
+    /* ── Kart ───────────────────────────────── */
     .kart {
-      background: white;
-      border-radius: 12px;
-      padding: 24px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      background: #fff;
+      border-radius: 14px;
+      padding: 24px 28px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04);
     }
 
-    .kart-baslik {
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.09em;
+    .etiket {
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: #1b6ca8;
+      color: #2563eb;
       margin-bottom: 14px;
     }
 
-    /* Soru Giriş */
-    .soru-satir {
+    /* ── Soru Girişi ────────────────────────── */
+    .giris-satir {
       display: flex;
       gap: 10px;
     }
 
-    input[type="text"] {
+    .giris-satir input {
       flex: 1;
-      padding: 14px 16px;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 10px;
-      font-size: 0.98rem;
-      font-family: inherit;
-      color: #1a2332;
-      transition: border-color 0.15s;
-    }
-    input[type="text"]:focus { outline: none; border-color: #1b6ca8; }
-    input[type="text"]::placeholder { color: #94a3b8; }
-
-    .btn-sor {
-      padding: 14px 24px;
-      background: #1b6ca8;
-      color: white;
-      border: none;
+      padding: 13px 16px;
+      border: 1.5px solid #cbd5e1;
       border-radius: 10px;
       font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-      white-space: nowrap;
+      font-family: inherit;
+      color: #1e293b;
+      background: #f8fafc;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
     }
-    .btn-sor:hover:not(:disabled) { background: #155a8a; }
-    .btn-sor:disabled { opacity: 0.5; cursor: not-allowed; }
+    .giris-satir input:focus {
+      border-color: #2563eb;
+      background: #fff;
+    }
+    .giris-satir input::placeholder { color: #94a3b8; }
 
-    /* Örnek sorular */
-    .ornek-baslik {
+    .btn-sor {
+      padding: 13px 22px;
+      background: #2563eb;
+      color: #fff;
+      border: none; border-radius: 10px;
+      font-size: 0.92rem; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-sor:hover:not(:disabled) { background: #1d4ed8; }
+    .btn-sor:active:not(:disabled) { transform: scale(0.97); }
+    .btn-sor:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Örnek Sorular ──────────────────────── */
+    .ornek-baslik { font-size: 0.75rem; color: #94a3b8; margin-top: 14px; margin-bottom: 8px; }
+    .ornek-satirlar { display: flex; flex-wrap: wrap; gap: 7px; }
+    .chip {
       font-size: 0.78rem;
-      color: #94a3b8;
-      margin-top: 12px;
-      margin-bottom: 8px;
-    }
-    .ornek-satirlar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .ornek-chip {
-      font-size: 0.8rem;
-      padding: 6px 12px;
+      padding: 5px 13px;
       background: #f1f5f9;
       border: 1px solid #e2e8f0;
-      border-radius: 20px;
-      cursor: pointer;
-      color: #475569;
-      transition: all 0.15s;
+      border-radius: 999px;
+      cursor: pointer; color: #475569;
+      transition: all 0.13s;
+      user-select: none;
     }
-    .ornek-chip:hover { background: #dbeafe; border-color: #93c5fd; color: #1b6ca8; }
+    .chip:hover { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
 
-    /* Sonuç */
-    #sonuc-kart { display: none; }
+    /* ── Yükleniyor ─────────────────────────── */
+    .yukluyor {
+      display: none;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 28px;
+      color: #64748b;
+      font-size: 0.88rem;
+    }
+    .yukluyor.aktif { display: flex; }
+    .spinner {
+      width: 20px; height: 20px; flex-shrink: 0;
+      border: 3px solid #e2e8f0;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .cevap-metni {
-      font-size: 0.97rem;
-      line-height: 1.75;
-      color: #1a2332;
+    /* ── Sonuç Kartı ────────────────────────── */
+    #sonuc { display: none; }
+
+    .cevap-kutu {
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: #1e293b;
       background: #f8fafc;
-      border-radius: 8px;
-      padding: 16px 18px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 20px;
       white-space: pre-wrap;
     }
 
-    /* Dayanalık Göstergesi */
-    .dayanlik-bolum { margin-top: 20px; }
+    /* ── Dayalılık ──────────────────────────── */
+    .dayanlik-bolum { margin-top: 22px; }
 
     .dayanlik-ust {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       margin-bottom: 10px;
     }
 
-    .dayanlik-etiket {
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: #64748b;
+    .dayanlik-ust .etiket { margin-bottom: 0; }
+
+    .rozet {
+      font-size: 1rem; font-weight: 800;
+      padding: 4px 16px;
+      border-radius: 999px;
+      color: #fff;
+      min-width: 64px;
+      text-align: center;
     }
 
-    .dayanlik-badge {
-      font-size: 1.1rem;
-      font-weight: 700;
-      padding: 4px 14px;
-      border-radius: 20px;
-      color: white;
+    .cubuk-arka {
+      height: 12px; border-radius: 999px;
+      background: #e2e8f0; overflow: hidden;
+    }
+    .cubuk-dolu {
+      height: 100%; border-radius: 999px;
+      transition: width 0.9s cubic-bezier(.4,0,.2,1);
+      width: 0%;
     }
 
-    .bar-arka {
-      background: #e2e8f0;
-      border-radius: 99px;
-      height: 14px;
-      overflow: hidden;
-    }
-    .bar-dolu {
-      height: 100%;
-      border-radius: 99px;
-      transition: width 1s ease;
-    }
-
-    .dayanlik-aciklama {
-      margin-top: 8px;
-      font-size: 0.82rem;
+    .dayanlik-not {
+      margin-top: 7px;
+      font-size: 0.79rem;
       color: #64748b;
       font-style: italic;
     }
 
-    /* Kaynaklar */
-    .kaynak-bolum { margin-top: 20px; }
-    .bolum-baslik {
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.09em;
-      text-transform: uppercase;
-      color: #64748b;
-      margin-bottom: 10px;
-    }
+    /* ── Kaynaklar ──────────────────────────── */
+    .kaynak-bolum { margin-top: 22px; }
+    .kaynak-liste { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 
-    .kaynak-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .kaynak-item {
+    .kaynak {
       border: 1px solid #e2e8f0;
-      border-radius: 8px;
+      border-radius: 9px;
       overflow: hidden;
     }
-
     .kaynak-baslik {
       background: #f1f5f9;
-      padding: 8px 14px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #1b6ca8;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      padding: 7px 14px;
+      font-size: 0.75rem; font-weight: 700;
+      color: #2563eb;
+      display: flex; align-items: center; gap: 6px;
     }
-
     .kaynak-metin {
       padding: 10px 14px;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       color: #475569;
       line-height: 1.6;
     }
 
-    /* Yükleniyor */
-    .yukluyor-alan {
-      display: none;
-      align-items: center;
-      gap: 12px;
-      padding: 20px;
-      color: #64748b;
-      font-size: 0.9rem;
+    /* ── Hata ───────────────────────────────── */
+    .hata-kutu {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 0.88rem;
+      color: #b91c1c;
+      line-height: 1.6;
     }
-    .yukluyor-alan.aktif { display: flex; }
-
-    .spinner {
-      width: 22px;
-      height: 22px;
-      border: 3px solid #e2e8f0;
-      border-top-color: #1b6ca8;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      flex-shrink: 0;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-<header>
-  <div>
+<div class="header">
+  <div class="header-sol">
     <h1>Diş Hekimliği AI Asistan</h1>
-    <p>Soru sor — AI, Wheeler kitabına dayanarak cevap verir</p>
+    <p>Wheeler kitabına dayanarak Türkçe cevap verir</p>
   </div>
   <a href="/" class="header-link">Sınav Modu →</a>
-</header>
+</div>
 
-<div class="container">
+<div class="sayfa">
 
   <!-- Soru Kartı -->
   <div class="kart">
-    <div class="kart-baslik">Soru Sor</div>
-
-    <div class="soru-satir">
-      <input type="text" id="soru-input"
+    <div class="etiket">Soru Sor</div>
+    <div class="giris-satir">
+      <input id="soru-input" type="text"
              placeholder="Örn: Mine tabakasının özellikleri nedir?"
              onkeydown="if(event.key==='Enter') sor()" />
       <button class="btn-sor" id="btn-sor" onclick="sor()">Sor</button>
     </div>
-
-    <div class="ornek-baslik">Örnek sorular:</div>
+    <div class="ornek-baslik">Örnek sorular</div>
     <div class="ornek-satirlar">
-      <span class="ornek-chip" onclick="soruSec(this)">Mine tabakası neden önemlidir?</span>
-      <span class="ornek-chip" onclick="soruSec(this)">Pulpa odasının görevi nedir?</span>
-      <span class="ornek-chip" onclick="soruSec(this)">Molar dişler kaç köke sahiptir?</span>
-      <span class="ornek-chip" onclick="soruSec(this)">Dentin ile mine arasındaki fark nedir?</span>
-      <span class="ornek-chip" onclick="soruSec(this)">Periodontal ligamentin işlevi nedir?</span>
+      <span class="chip" onclick="soruSec(this)">Mine tabakası neden önemlidir?</span>
+      <span class="chip" onclick="soruSec(this)">Pulpa odasının görevi nedir?</span>
+      <span class="chip" onclick="soruSec(this)">Molar dişler kaç köke sahiptir?</span>
+      <span class="chip" onclick="soruSec(this)">Dentin ile mine arasındaki fark nedir?</span>
+      <span class="chip" onclick="soruSec(this)">Periodontal ligamentin işlevi nedir?</span>
     </div>
   </div>
 
   <!-- Yükleniyor -->
-  <div class="kart yukluyor-alan" id="yukluyor">
+  <div class="kart yukluyor" id="yukluyor">
     <div class="spinner"></div>
-    <span>AI kitabı inceliyor, cevap hazırlanıyor...</span>
+    <span>AI kitabı inceliyor, cevap hazırlanıyor…</span>
   </div>
 
-  <!-- Sonuç Kartı -->
-  <div class="kart" id="sonuc-kart">
+  <!-- Sonuç -->
+  <div class="kart" id="sonuc">
+    <div class="etiket">AI Cevabı</div>
+    <div class="cevap-kutu" id="cevap-kutu"></div>
 
-    <div class="kart-baslik">AI Cevabı</div>
-    <div class="cevap-metni" id="cevap-metni"></div>
-
-    <!-- Dayanalık Göstergesi -->
-    <div class="dayanlik-bolum">
+    <div class="dayanlik-bolum" id="dayanlik-bolum">
       <div class="dayanlik-ust">
-        <span class="dayanlik-etiket">Kitaba Dayalılık</span>
-        <span class="dayanlik-badge" id="dayanlik-badge">—</span>
+        <span class="etiket">Kitaba Dayalılık</span>
+        <span class="rozet" id="rozet"></span>
       </div>
-      <div class="bar-arka">
-        <div class="bar-dolu" id="bar-dolu" style="width:0%"></div>
+      <div class="cubuk-arka">
+        <div class="cubuk-dolu" id="cubuk"></div>
       </div>
-      <div class="dayanlik-aciklama" id="dayanlik-aciklama"></div>
+      <div class="dayanlik-not" id="dayanlik-not"></div>
     </div>
 
-    <!-- Kaynaklar -->
-    <div class="kaynak-bolum">
-      <div class="bolum-baslik">Wheeler Kitabı Kaynakları</div>
-      <div class="kaynak-grid" id="kaynak-grid"></div>
+    <div class="kaynak-bolum" id="kaynak-bolum">
+      <div class="etiket">Wheeler Kitabı Kaynakları</div>
+      <div class="kaynak-liste" id="kaynak-liste"></div>
     </div>
-
   </div>
 
 </div>
@@ -312,9 +285,9 @@
   const API = "http://localhost:8000";
 
   function renk(d) {
-    if (d >= 80) return "#22c55e";
-    if (d >= 50) return "#f59e0b";
-    return "#ef4444";
+    if (d >= 80) return "#16a34a";
+    if (d >= 50) return "#d97706";
+    return "#dc2626";
   }
 
   function soruSec(el) {
@@ -328,44 +301,64 @@
 
     const btn = document.getElementById("btn-sor");
     btn.disabled = true;
-    document.getElementById("sonuc-kart").style.display = "none";
+    document.getElementById("sonuc").style.display = "none";
     document.getElementById("yukluyor").classList.add("aktif");
 
+    let res;
     try {
-      const res  = await fetch(`${API}/ai-cevapla`, {
+      res = await fetch(`${API}/ai-cevapla`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ soru }),
       });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw { status: res.status, detail: err.detail || "" };
+      }
+
       const data = await res.json();
 
       // Cevap
-      document.getElementById("cevap-metni").textContent = data.cevap;
+      document.getElementById("cevap-kutu").textContent = data.cevap;
 
-      // Dayanalık çubuğu
-      const d = data.dayanilik;
-      const r = renk(d);
-      document.getElementById("dayanlik-badge").textContent = `%${d}`;
-      document.getElementById("dayanlik-badge").style.background = r;
-      document.getElementById("bar-dolu").style.width = `${d}%`;
-      document.getElementById("bar-dolu").style.background = r;
-      document.getElementById("dayanlik-aciklama").textContent = data.aciklama;
+      // Dayalılık
+      const d   = data.dayanilik ?? 0;
+      const r   = renk(d);
+      document.getElementById("rozet").textContent        = `%${d}`;
+      document.getElementById("rozet").style.background   = r;
+      document.getElementById("cubuk").style.width        = `${d}%`;
+      document.getElementById("cubuk").style.background   = r;
+      document.getElementById("dayanlik-not").textContent = data.aciklama ?? "";
 
       // Kaynaklar
-      document.getElementById("kaynak-grid").innerHTML = data.kaynaklar.map((k, i) => `
-        <div class="kaynak-item">
-          <div class="kaynak-baslik">
-            <span>📄</span> Sayfa ${k.sayfa}
+      const liste = document.getElementById("kaynak-liste");
+      if (data.kaynaklar && data.kaynaklar.length) {
+        liste.innerHTML = data.kaynaklar.map(k => `
+          <div class="kaynak">
+            <div class="kaynak-baslik">📄 Sayfa ${k.sayfa}</div>
+            <div class="kaynak-metin">${k.metin}</div>
           </div>
-          <div class="kaynak-metin">${k.metin}</div>
-        </div>
-      `).join("");
+        `).join("");
+        document.getElementById("kaynak-bolum").style.display = "block";
+      } else {
+        document.getElementById("kaynak-bolum").style.display = "none";
+      }
 
-      document.getElementById("sonuc-kart").style.display = "block";
-      document.getElementById("sonuc-kart").scrollIntoView({ behavior: "smooth" });
+      document.getElementById("dayanlik-bolum").style.display = "block";
+      document.getElementById("sonuc").style.display = "block";
+      document.getElementById("sonuc").scrollIntoView({ behavior: "smooth", block: "start" });
 
     } catch (e) {
-      alert("Bağlantı hatası. API çalışıyor mu? (http://localhost:8000)");
+      let mesaj;
+      if (e.status === 503)      mesaj = "Tüm modellerin günlük kotası doldu. Gece yarısından sonra (TSİ 10:00) tekrar çalışır.";
+      else if (e.status === 429) mesaj = "Çok fazla istek gönderildi, birkaç saniye bekleyip tekrar dene.";
+      else                       mesaj = "API'ye bağlanılamadı. Sunucu çalışıyor mu? (http://localhost:8000)";
+
+      document.getElementById("cevap-kutu").innerHTML = `<div class="hata-kutu">${mesaj}</div>`;
+      document.getElementById("dayanlik-bolum").style.display = "none";
+      document.getElementById("kaynak-bolum").style.display   = "none";
+      document.getElementById("sonuc").style.display = "block";
     } finally {
       btn.disabled = false;
       document.getElementById("yukluyor").classList.remove("aktif");
