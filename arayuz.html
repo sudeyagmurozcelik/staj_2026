@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diş Hekimliği Sınav Sistemi</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f4f8;
+      color: #1a2332;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0077b6, #00b4d8);
+      color: white;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header p  { font-size: 0.85rem; opacity: 0.85; margin-top: 2px; }
+
+    .container {
+      max-width: 820px;
+      margin: 32px auto;
+      padding: 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .kart {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .kart h2 {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #0077b6;
+      margin-bottom: 14px;
+    }
+
+    /* Soru Alanı */
+    .soru-kutu {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 18px 20px;
+      font-size: 1.05rem;
+      line-height: 1.6;
+      color: #1a2332;
+      min-height: 64px;
+    }
+    .soru-kutu.yukluyor { color: #94a3b8; font-style: italic; }
+
+    .btn-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-yeni {
+      background: #e0f2fe;
+      color: #0077b6;
+    }
+    .btn-yeni:hover:not(:disabled) { background: #bae6fd; }
+
+    .btn-gonder {
+      background: #0077b6;
+      color: white;
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      border-radius: 10px;
+      margin-top: 4px;
+    }
+    .btn-gonder:hover:not(:disabled) { background: #005f8e; }
+
+    /* Cevap Alanı */
+    textarea {
+      width: 100%;
+      min-height: 130px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      line-height: 1.6;
+      resize: vertical;
+      transition: border-color 0.15s;
+      color: #1a2332;
+    }
+    textarea:focus { outline: none; border-color: #0077b6; }
+
+    /* Sonuç */
+    #sonuc-kart { display: none; }
+
+    .yuzde-satir {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .yuzde-daire {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      color: white;
+    }
+
+    .bar-alan { flex: 1; }
+    .bar-etiket {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    .bar-arka {
+      background: #e2e8f0;
+      border-radius: 99px;
+      height: 12px;
+      overflow: hidden;
+    }
+    .bar-dolu {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.8s ease;
+    }
+
+    .bolum-baslik {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #64748b;
+      margin: 16px 0 8px;
+    }
+
+    .geri-bildirim-kutu {
+      background: #f0f9ff;
+      border-left: 4px solid #0077b6;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 16px;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: #1a2332;
+    }
+
+    .dogru-cevap-kutu {
+      background: #f0fdf4;
+      border-left: 4px solid #22c55e;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 16px;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: #1a2332;
+    }
+
+    .kaynak-liste { display: flex; flex-direction: column; gap: 8px; }
+
+    .kaynak-item {
+      background: #fafafa;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .kaynak-sayfa {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #0077b6;
+      margin-bottom: 4px;
+    }
+    .kaynak-metin {
+      font-size: 0.82rem;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Diş Hekimliği Sınav Sistemi</h1>
+    <p>Sorulara cevap ver — AI, cevabını Wheeler ders kitabına göre değerlendirir</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Soru Kartı -->
+  <div class="kart">
+    <h2>Soru</h2>
+    <div class="soru-kutu yukluyor" id="soru-metin">Soru yükleniyor...</div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn-yeni" id="btn-yeni" onclick="soruGetir()">↻ Yeni Soru</button>
+    </div>
+  </div>
+
+  <!-- Cevap Kartı -->
+  <div class="kart">
+    <h2>Cevabın</h2>
+    <textarea id="cevap-girdisi" placeholder="Cevabını buraya yaz..."></textarea>
+    <button class="btn-gonder" id="btn-gonder" onclick="degerlendir()">
+      Cevabı Değerlendir
+    </button>
+  </div>
+
+  <!-- Sonuç Kartı -->
+  <div class="kart" id="sonuc-kart">
+    <h2>Değerlendirme Sonucu</h2>
+
+    <div class="yuzde-satir">
+      <div class="yuzde-daire" id="yuzde-daire">—</div>
+      <div class="bar-alan">
+        <div class="bar-etiket">Doğruluk Oranı</div>
+        <div class="bar-arka">
+          <div class="bar-dolu" id="bar-dolu" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bolum-baslik">Geri Bildirim</div>
+    <div class="geri-bildirim-kutu" id="geri-bildirim"></div>
+
+    <div class="bolum-baslik">Kitaba Göre Doğru Cevap</div>
+    <div class="dogru-cevap-kutu" id="dogru-cevap"></div>
+
+    <div class="bolum-baslik">Kaynaklar (Wheeler Kitabı)</div>
+    <div class="kaynak-liste" id="kaynak-liste"></div>
+  </div>
+
+</div>
+
+<script>
+  const API = "http://localhost:8000";
+  let mevcutSoru = "";
+
+  function renk(yuzde) {
+    if (yuzde >= 80) return "#22c55e";
+    if (yuzde >= 50) return "#f59e0b";
+    return "#ef4444";
+  }
+
+  async function soruGetir() {
+    const soruEl = document.getElementById("soru-metin");
+    const btn    = document.getElementById("btn-yeni");
+
+    soruEl.textContent = "Soru yükleniyor...";
+    soruEl.classList.add("yukluyor");
+    btn.disabled = true;
+
+    document.getElementById("sonuc-kart").style.display = "none";
+    document.getElementById("cevap-girdisi").value = "";
+
+    try {
+      const res  = await fetch(`${API}/soru-getir`);
+      const data = await res.json();
+
+      mevcutSoru = data.soru;
+      soruEl.textContent = data.soru;
+      soruEl.classList.remove("yukluyor");
+    } catch (e) {
+      soruEl.textContent = "Soru yüklenemedi. API çalışıyor mu?";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function degerlendir() {
+    const cevap = document.getElementById("cevap-girdisi").value.trim();
+    const btn   = document.getElementById("btn-gonder");
+
+    if (!cevap) {
+      alert("Lütfen önce cevabını yaz.");
+      return;
+    }
+    if (!mevcutSoru) {
+      alert("Önce bir soru yükle.");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Değerlendiriliyor...';
+
+    try {
+      const res  = await fetch(`${API}/degerlendir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ soru: mevcutSoru, ogrenci_cevabi: cevap }),
+      });
+      const data = await res.json();
+
+      const yuzde = data.yuzde;
+      const r     = renk(yuzde);
+
+      document.getElementById("yuzde-daire").textContent = `%${yuzde}`;
+      document.getElementById("yuzde-daire").style.background = r;
+      document.getElementById("bar-dolu").style.width      = `${yuzde}%`;
+      document.getElementById("bar-dolu").style.background = r;
+      document.getElementById("geri-bildirim").textContent = data.geri_bildirim;
+      document.getElementById("dogru-cevap").textContent   = data.dogru_cevap;
+
+      const kaynak = document.getElementById("kaynak-liste");
+      kaynak.innerHTML = data.kaynaklar.map(k => `
+        <div class="kaynak-item">
+          <div class="kaynak-sayfa">Sayfa ${k.sayfa}</div>
+          <div class="kaynak-metin">${k.metin}</div>
+        </div>
+      `).join("");
+
+      document.getElementById("sonuc-kart").style.display = "block";
+      document.getElementById("sonuc-kart").scrollIntoView({ behavior: "smooth" });
+
+    } catch (e) {
+      alert("Değerlendirme başarısız. API çalışıyor mu?");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "Cevabı Değerlendir";
+    }
+  }
+
+  // Sayfa açılınca ilk soruyu getir
+  soruGetir();
+</script>
+
+</body>
+</html>
