@@ -16,6 +16,7 @@ from pydantic import BaseModel
 import chromadb
 from google import genai
 from google.genai import types
+from openai import OpenAI
 import os
 import json
 import random
@@ -26,14 +27,20 @@ load_dotenv()
 
 DB_PATH = "chroma_db"
 TOP_K = 5
-EMBED_MODEL = "gemini-embedding-001"
-# Kota dolduğunda sıradaki modele geçilir
+EMBED_MODEL = "text-embedding-3-large"   # indexer.py ile BİREBİR aynı — değiştirme
+# Kota dolduğunda sıradaki Gemini modeline, hepsi dolunca OpenAI'ye geçilir
 GEN_MODELLER = [
     "gemini-3-flash-preview",
     "gemini-2.0-flash-lite",
 ]
+OPENAI_MODEL = "gpt-4o-mini"
 
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+
+_openai_client = None
+_oai_key = os.environ.get("OPENAI_API_KEY", "")
+if _oai_key:
+    _openai_client = OpenAI(api_key=_oai_key)
 
 app = FastAPI(title="Diş Hekimliği AI Avatar API")
 
@@ -56,52 +63,82 @@ def get_collection():
 
 
 def embed(text: str) -> list[float]:
-    return client.models.embed_content(
-        model=EMBED_MODEL,
-        contents=text,
-    ).embeddings[0].values
+    resp = _openai_client.embeddings.create(model=EMBED_MODEL, input=text)
+    return resp.data[0].embedding
 
 
 def turkce_ingilizce_cevir(metin: str) -> str:
-    """Türkçe sorguyu İngilizce'ye çevirir. Hata olursa orijinal metni döndürür."""
+    """Türkçe sorguyu OpenAI ile İngilizce'ye çevirir."""
     try:
-        # Çeviri için hızlı tek deneme — fallback döngüsü gerek yok
-        resp = client.models.generate_content(
-            model="gemini-2.0-flash-lite",
-            contents=metin,
-            config=types.GenerateContentConfig(
-                system_instruction=(
-                    "Translate the following dental question from Turkish to English. "
-                    "Output ONLY the English translation, nothing else."
-                )
-            ),
+        resp = _openai_client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a professional dental translator. "
+                        "Translate the Turkish dentistry question into English for searching "
+                        "in Wheeler's Dental Anatomy. "
+                        "Use correct dental terminology. "
+                        "Important terms: mine/mine tabakası = enamel, dentin = dentin, "
+                        "pulpa = pulp, pulpa odası = pulp chamber, sement = cementum, "
+                        "periodontal ligament = periodontal ligament. "
+                        "Only output the translated English question. "
+                        "Do not answer the question."
+                    ),
+                },
+                {"role": "user", "content": metin},
+            ],
         )
-        return resp.text.strip()
-    except Exception:
+
+        ceviri = resp.choices[0].message.content.strip()
+        print("OPENAI TRANSLATED QUERY:", ceviri)
+        return ceviri
+
+    except Exception as e:
+        print("OPENAI TRANSLATION ERROR:", e)
         return metin
 
 
 def retrieve(soru: str, k: int = TOP_K):
     """Sorguyu İngilizce'ye çevirip arama yapar (kitap İngilizce)."""
     collection = get_collection()
+
     ingilizce_soru = turkce_ingilizce_cevir(soru)
-    results = collection.query(query_embeddings=[embed(ingilizce_soru)], n_results=k)
+
+    print("\n" + "-" * 60)
+    print("RETRIEVAL QUERY :", ingilizce_soru)
+    print("-" * 60)
+
+    results = collection.query(
+        query_embeddings=[embed(ingilizce_soru)],
+        n_results=k
+    )
+
+    print("FOUND PAGES :", [m["page"] for m in results["metadatas"][0]])
+    print("-" * 60 + "\n")
+
     return results["documents"][0], results["metadatas"][0]
 
 
-def gemini_uret(contents: str, system: str) -> str:
+def gemini_uret(contents: str, system: str, json_mode: bool = False) -> str:
     """
     Modelleri sırayla dener.
     429/EXHAUSTED → kota doldu, hemen sonraki modele geç (bekleme yok).
     503/UNAVAILABLE → geçici hata, 3sn bekleyip bir kez daha dene.
+    json_mode=True → model her zaman geçerli JSON döndürür.
     """
+    cfg = types.GenerateContentConfig(system_instruction=system)
+    if json_mode:
+        cfg.response_mime_type = "application/json"
+
     for model in GEN_MODELLER:
         for deneme in range(2):
             try:
                 resp = client.models.generate_content(
                     model=model,
                     contents=contents,
-                    config=types.GenerateContentConfig(system_instruction=system),
+                    config=cfg,
                 )
                 return resp.text.strip()
             except Exception as e:
@@ -116,9 +153,24 @@ def gemini_uret(contents: str, system: str) -> str:
                 else:
                     raise  # beklenmedik hata — direkt fırlat
 
+    # Tüm Gemini modelleri doldu → OpenAI'ye geç
+    if _openai_client:
+        try:
+            msgs = [
+                {"role": "system", "content": system},
+                {"role": "user",   "content": contents},
+            ]
+            kwargs = {"model": OPENAI_MODEL, "messages": msgs}
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+            resp = _openai_client.chat.completions.create(**kwargs)
+            return resp.choices[0].message.content.strip()
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"OpenAI de başarısız: {e}")
+
     raise HTTPException(
         status_code=503,
-        detail="Tüm modellerin kotası doldu. Gece yarısından sonra (TSİ 10:00) tekrar dene."
+        detail="Tüm Gemini kotaları doldu ve OPENAI_API_KEY tanımlı değil."
     )
 
 
@@ -159,7 +211,7 @@ class Soru(BaseModel):
 
 
 class DegerlendirmeGirdisi(BaseModel):
-    soru: str
+    soru: system_instruction
     ogrenci_cevabi: str
 
 
@@ -184,17 +236,28 @@ class DegerlendirmeSonucu(BaseModel):
 # ─── Endpointler ─────────────────────────────────────────────────────────────
 
 AI_CEVAPLAMA_KOMUTU = """Sen bir diş hekimliği eğitim asistanısın.
-Sana verilen BAĞLAM (ders kitabı bölümleri) ve SORU'ya göre yanıt ver.
+Sana verilen BAĞLAM (ders kitabı bölümleri) ve SORU'ya göre Türkçe yanıt ver.
+
+Kurallar:
+- Yalnızca BAĞLAM içindeki bilgileri kullan.
+- Bağlamda açıkça geçmeyen genel diş hekimliği bilgisini EKLEME.
+- Kendi ön bilginle açıklama yapma veya çıkarım yürütme.
+- Cevabı kısa tut (2-4 cümle).
+- Yalnızca bağlamdan desteklenebilen ifadeler kur.
 
 SADECE şu JSON formatında yanıt ver, başka hiçbir şey yazma:
-{
-  "cevap": "<Türkçe, net ve açıklayıcı cevap>",
-  "dayanilik": <0-100 arası tam sayı — cevabın yüzde kaçı doğrudan bağlamdan geliyor>,
-  "aciklama": "<neden bu oranı verdin, 1 kısa cümle>"
-}
+{"cevap": "<Türkçe, kısa ve bağlama sadık cevap>"}
 
-Bağlamda olmayan hiçbir bilgiyi ekleme.
-Bağlamda cevap yoksa cevap alanına "Bu konu ders kitabında yer almıyor." yaz ve dayanilik 0 ver."""
+Bağlamda cevap yoksa:
+{"cevap": "Bu konu ders kitabında yer almıyor."}"""
+
+HAKEM_KOMUTU = """Sen bağımsız bir diş hekimliği eğitim değerlendiricisindir.
+Sana bir BAĞLAM (ders kitabı bölümleri) ve bir ÜRETİLEN CEVAP verilecek.
+Görevin: cevabın içeriğinin ne kadarı doğrudan bağlamdan kaynaklanıyor, 0-100 arası puan ver.
+Cevabı yeniden üretme; yalnızca puanla ve 1 cümle gerekçe yaz.
+
+SADECE şu JSON formatında yanıt ver, başka hiçbir şey yazma:
+{"dayanilik": <0-100 tam sayı>, "aciklama": "<1 kısa Türkçe cümle>"}"""
 
 
 class AICevap(BaseModel):
@@ -216,30 +279,31 @@ def ai_cevapla(body: Soru):
 
     baglam = baglam_olustur(documents, metadatas)
 
-    raw = gemini_uret(
+    # 1. Adım: cevabı üret
+    raw_cevap = gemini_uret(
         contents=f"BAĞLAM:\n{baglam}\n\nSORU: {body.soru}",
         system=AI_CEVAPLAMA_KOMUTU,
+        json_mode=True,
     )
-    # ```json ... ``` bloğunu temizle
-    if "```" in raw:
-        parts = raw.split("```")
-        for part in parts:
-            part = part.strip()
-            if part.startswith("json"):
-                part = part[4:].strip()
-            if part.startswith("{"):
-                raw = part
-                break
-
     try:
-        data = json.loads(raw)
+        cevap_data = json.loads(raw_cevap)
+        uretilen_cevap = cevap_data.get("cevap", raw_cevap)
     except json.JSONDecodeError:
-        # JSON parse başarısız — cevabı ham metin olarak kullan
-        data = {
-            "cevap": raw if raw else "Cevap üretilemedi.",
-            "dayanilik": 50,
-            "aciklama": "Yanıt formatı beklenenden farklıydı.",
-        }
+        uretilen_cevap = raw_cevap if raw_cevap else "Cevap üretilemedi."
+
+    # 2. Adım: bağımsız hakem cevabı puanlar
+    raw_hakem = gemini_uret(
+        contents=f"BAĞLAM:\n{baglam}\n\nÜRETİLEN CEVAP:\n{uretilen_cevap}",
+        system=HAKEM_KOMUTU,
+        json_mode=True,
+    )
+    try:
+        hakem_data = json.loads(raw_hakem)
+        dayanilik = max(0, min(100, int(hakem_data.get("dayanilik", 0))))
+        aciklama  = hakem_data.get("aciklama", "")
+    except (json.JSONDecodeError, ValueError):
+        dayanilik = 0
+        aciklama  = "Hakem değerlendirmesi ayrıştırılamadı."
 
     kaynaklar = [
         {"sayfa": m["page"], "metin": doc[:250] + "..."}
@@ -247,11 +311,11 @@ def ai_cevapla(body: Soru):
     ]
 
     return AICevap(
-        cevap=data.get("cevap", ""),
-        dayanilik=max(0, min(100, int(data.get("dayanilik", 0)))),
-        aciklama=data.get("aciklama", ""),
-        kaynaklar=kaynaklar,
-    )
+    cevap=uretilen_cevap,
+    dayanilik=dayanilik,
+    aciklama=aciklama,
+    kaynaklar=kaynaklar,
+)
 
 
 @app.get("/")
@@ -330,16 +394,16 @@ def degerlendir(body: DegerlendirmeGirdisi):
         f"ÖĞRENCİNİN CEVABI: {body.ogrenci_cevabi}"
     )
 
-    raw = gemini_uret(contents=prompt, system=DEGERLENDIRME_KOMUTU)
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
+    raw = gemini_uret(contents=prompt, system=DEGERLENDIRME_KOMUTU, json_mode=True)
 
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Değerlendirme ayrıştırılamadı.")
+        data = {
+            "yuzde": 0,
+            "geri_bildirim": "Yanıt formatı beklenenden farklıydı, değerlendirme yapılamadı.",
+            "dogru_cevap": "Yanıt formatı beklenenden farklıydı, değerlendirme yapılamadı.",
+        }
 
     kaynaklar = [
         {"sayfa": m["page"], "metin": doc[:250] + "..."}
