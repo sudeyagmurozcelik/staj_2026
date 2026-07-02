@@ -2,6 +2,5 @@ pdfplumber
 chromadb
 fastapi
 uvicorn
-google-genai
 python-dotenv
 openai

@@ -14,33 +14,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import chromadb
-from google import genai
-from google.genai import types
 from openai import OpenAI
 import os
 import json
 import random
-import time
 from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_PATH = "chroma_db"
-TOP_K = 5
+DB_PATH     = "chroma_db"
+TOP_K       = 5
 EMBED_MODEL = "text-embedding-3-large"   # indexer.py ile BİREBİR aynı — değiştirme
-# Kota dolduğunda sıradaki Gemini modeline, hepsi dolunca OpenAI'ye geçilir
-GEN_MODELLER = [
-    "gemini-3-flash-preview",
-    "gemini-2.0-flash-lite",
-]
-OPENAI_MODEL = "gpt-4o-mini"
+GEN_MODEL   = "gpt-4o-mini"
 
-client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-
-_openai_client = None
 _oai_key = os.environ.get("OPENAI_API_KEY", "")
-if _oai_key:
-    _openai_client = OpenAI(api_key=_oai_key)
+if not _oai_key:
+    raise RuntimeError("OPENAI_API_KEY tanımlı değil. .env dosyasını kontrol et.")
+openai_client = OpenAI(api_key=_oai_key)
 
 app = FastAPI(title="Diş Hekimliği AI Avatar API")
 
@@ -63,15 +53,15 @@ def get_collection():
 
 
 def embed(text: str) -> list[float]:
-    resp = _openai_client.embeddings.create(model=EMBED_MODEL, input=text)
+    resp = openai_client.embeddings.create(model=EMBED_MODEL, input=text)
     return resp.data[0].embedding
 
 
 def turkce_ingilizce_cevir(metin: str) -> str:
     """Türkçe sorguyu OpenAI ile İngilizce'ye çevirir."""
     try:
-        resp = _openai_client.chat.completions.create(
-            model=OPENAI_MODEL,
+        resp = openai_client.chat.completions.create(
+            model=GEN_MODEL,
             messages=[
                 {
                     "role": "system",
@@ -90,88 +80,35 @@ def turkce_ingilizce_cevir(metin: str) -> str:
                 {"role": "user", "content": metin},
             ],
         )
-
-        ceviri = resp.choices[0].message.content.strip()
-        print("OPENAI TRANSLATED QUERY:", ceviri)
-        return ceviri
-
-    except Exception as e:
-        print("OPENAI TRANSLATION ERROR:", e)
+        return resp.choices[0].message.content.strip()
+    except Exception:
         return metin
 
 
 def retrieve(soru: str, k: int = TOP_K):
     """Sorguyu İngilizce'ye çevirip arama yapar (kitap İngilizce)."""
     collection = get_collection()
-
     ingilizce_soru = turkce_ingilizce_cevir(soru)
-
-    print("\n" + "-" * 60)
-    print("RETRIEVAL QUERY :", ingilizce_soru)
-    print("-" * 60)
-
-    results = collection.query(
-        query_embeddings=[embed(ingilizce_soru)],
-        n_results=k
-    )
-
-    print("FOUND PAGES :", [m["page"] for m in results["metadatas"][0]])
-    print("-" * 60 + "\n")
-
+    results = collection.query(query_embeddings=[embed(ingilizce_soru)], n_results=k)
     return results["documents"][0], results["metadatas"][0]
 
 
 def gemini_uret(contents: str, system: str, json_mode: bool = False) -> str:
-    """
-    Modelleri sırayla dener.
-    429/EXHAUSTED → kota doldu, hemen sonraki modele geç (bekleme yok).
-    503/UNAVAILABLE → geçici hata, 3sn bekleyip bir kez daha dene.
-    json_mode=True → model her zaman geçerli JSON döndürür.
-    """
-    cfg = types.GenerateContentConfig(system_instruction=system)
-    if json_mode:
-        cfg.response_mime_type = "application/json"
-
-    for model in GEN_MODELLER:
-        for deneme in range(2):
-            try:
-                resp = client.models.generate_content(
-                    model=model,
-                    contents=contents,
-                    config=cfg,
-                )
-                return resp.text.strip()
-            except Exception as e:
-                hata = str(e)
-                if "429" in hata or "EXHAUSTED" in hata or "quota" in hata:
-                    break  # kota doldu — bekleme yok, hemen sonraki modele geç
-                elif "503" in hata or "UNAVAILABLE" in hata:
-                    if deneme == 0:
-                        time.sleep(3)  # geçici hata, bir kez bekle
-                    else:
-                        break
-                else:
-                    raise  # beklenmedik hata — direkt fırlat
-
-    # Tüm Gemini modelleri doldu → OpenAI'ye geç
-    if _openai_client:
-        try:
-            msgs = [
+    """OpenAI üzerinden metin üretir. json_mode=True ise JSON çıktısı garanti edilir."""
+    try:
+        kwargs = {
+            "model": GEN_MODEL,
+            "messages": [
                 {"role": "system", "content": system},
                 {"role": "user",   "content": contents},
-            ]
-            kwargs = {"model": OPENAI_MODEL, "messages": msgs}
-            if json_mode:
-                kwargs["response_format"] = {"type": "json_object"}
-            resp = _openai_client.chat.completions.create(**kwargs)
-            return resp.choices[0].message.content.strip()
-        except Exception as e:
-            raise HTTPException(status_code=503, detail=f"OpenAI de başarısız: {e}")
-
-    raise HTTPException(
-        status_code=503,
-        detail="Tüm Gemini kotaları doldu ve OPENAI_API_KEY tanımlı değil."
-    )
+            ],
+        }
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        resp = openai_client.chat.completions.create(**kwargs)
+        return resp.choices[0].message.content.strip()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"OpenAI servis hatası: {e}")
 
 
 def baglam_olustur(documents, metadatas) -> str:
@@ -203,38 +140,6 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir şey yazma:
   "dogru_cevap": "<kitaba göre doğru ve tam cevap, Türkçe>"
 }"""
 
-
-# ─── Veri Modelleri ──────────────────────────────────────────────────────────
-
-class Soru(BaseModel):
-    soru: str
-
-
-class DegerlendirmeGirdisi(BaseModel):
-    soru: system_instruction
-    ogrenci_cevabi: str
-
-
-class Cevap(BaseModel):
-    cevap: str
-    kaynaklar: list[dict]
-
-
-class SoruSonucu(BaseModel):
-    soru: str
-    kaynak_sayfa: int
-    kaynak_metin: str
-
-
-class DegerlendirmeSonucu(BaseModel):
-    yuzde: int
-    geri_bildirim: str
-    dogru_cevap: str
-    kaynaklar: list[dict]
-
-
-# ─── Endpointler ─────────────────────────────────────────────────────────────
-
 AI_CEVAPLAMA_KOMUTU = """Sen bir diş hekimliği eğitim asistanısın.
 Sana verilen BAĞLAM (ders kitabı bölümleri) ve SORU'ya göre Türkçe yanıt ver.
 
@@ -260,12 +165,43 @@ SADECE şu JSON formatında yanıt ver, başka hiçbir şey yazma:
 {"dayanilik": <0-100 tam sayı>, "aciklama": "<1 kısa Türkçe cümle>"}"""
 
 
+# ─── Veri Modelleri ──────────────────────────────────────────────────────────
+
+class Soru(BaseModel):
+    soru: str
+
+
+class DegerlendirmeGirdisi(BaseModel):
+    soru: str
+    ogrenci_cevabi: str
+
+
+class Cevap(BaseModel):
+    cevap: str
+    kaynaklar: list[dict]
+
+
+class SoruSonucu(BaseModel):
+    soru: str
+    kaynak_sayfa: int
+    kaynak_metin: str
+
+
+class DegerlendirmeSonucu(BaseModel):
+    yuzde: int
+    geri_bildirim: str
+    dogru_cevap: str
+    kaynaklar: list[dict]
+
+
 class AICevap(BaseModel):
     cevap: str
     dayanilik: int
     aciklama: str
     kaynaklar: list[dict]
 
+
+# ─── Endpointler ─────────────────────────────────────────────────────────────
 
 @app.post("/ai-cevapla", response_model=AICevap)
 def ai_cevapla(body: Soru):
@@ -286,8 +222,7 @@ def ai_cevapla(body: Soru):
         json_mode=True,
     )
     try:
-        cevap_data = json.loads(raw_cevap)
-        uretilen_cevap = cevap_data.get("cevap", raw_cevap)
+        uretilen_cevap = json.loads(raw_cevap).get("cevap", raw_cevap)
     except json.JSONDecodeError:
         uretilen_cevap = raw_cevap if raw_cevap else "Cevap üretilemedi."
 
@@ -311,11 +246,11 @@ def ai_cevapla(body: Soru):
     ]
 
     return AICevap(
-    cevap=uretilen_cevap,
-    dayanilik=dayanilik,
-    aciklama=aciklama,
-    kaynaklar=kaynaklar,
-)
+        cevap=uretilen_cevap,
+        dayanilik=dayanilik,
+        aciklama=aciklama,
+        kaynaklar=kaynaklar,
+    )
 
 
 @app.get("/")
